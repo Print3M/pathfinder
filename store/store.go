@@ -38,11 +38,11 @@ func (s *ScrapStore) Visits() uint64 {
 	return s.visits
 }
 
-func (s *ScrapStore) CountScraped() uint64 {
+func (s *ScrapStore) CountTotalStoredUrls() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return uint64(len(s.scraped))
+	return uint64(len(s.scraped) + len(s.toScrap))
 }
 
 func (s *ScrapStore) CountToScrap() uint64 {

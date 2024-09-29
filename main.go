@@ -42,7 +42,7 @@ func initScrap(c *crawler.Crawler, s *store.ScrapStore) {
 
 func showStats(s *store.ScrapStore) {
 	fmt.Printf("Visited: %v\n", s.Visits())
-	fmt.Printf("Scraped: %v\n", s.CountScraped())
+	fmt.Printf("Scraped: %v\n", s.CountTotalStoredUrls())
 }
 
 func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore) {
