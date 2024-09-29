@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"scraper/cli"
 	"scraper/crawler"
-	"slices"
+	"scraper/store"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,59 +12,52 @@ import (
 
 /*
 	TODO:
-		- remove GET params
 		- more tags than just a[href]
 */
 
 type Worker struct {
-	input  chan<- string
+	input  chan<- store.Url
 	done   <-chan struct{}
 	isIdle bool
 }
 
 var flags cli.Flags
 
-func extractUrlsWorker(c *crawler.Crawler, input <-chan string, done chan<- struct{}) {
+func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.Url, done chan<- struct{}) {
 	for url := range input {
-		// c.ChangeUrlStatus(url, crawler.Processed)
-		urls := c.ScrapUrlsFromWeb(url)
+		urls := c.ScrapUrlsFromUrl(url)
 
-		slices.Sort(urls)
 		for _, url := range urls {
-			c.AddUrl(url)
+			s.AddToScrap(url)
 		}
-
-		c.ChangeUrlStatus(url, crawler.Done)
 
 		done <- struct{}{}
 	}
 }
 
-func initScrap(c *crawler.Crawler) {
-	targetUrl := c.RootUrl().String()
-	c.AddUrl(targetUrl)
-	urls := c.ScrapUrlsFromWeb(targetUrl)
-	c.ChangeUrlStatus(targetUrl, crawler.Done)
+func initScrap(c *crawler.Crawler, s *store.ScrapStore) {
+	s.AddToScrap(*c.RootUrl())
+	url, _ := s.GetNextToScrap()
+	urls := c.ScrapUrlsFromUrl(url)
 
-	for _, url := range urls {
-		c.AddUrl(url)
+	for _, v := range urls {
+		s.AddToScrap(v)
 	}
-
-	c.IncVisits()
 }
 
-func showStats(c *crawler.Crawler) {
-	fmt.Printf("Visited: %v\n", c.Visits())
-	fmt.Printf("Scraped: %v\n", len(c.Urls()))
+func showStats(s *store.ScrapStore) {
+	fmt.Printf("Visited: %v\n", s.Visits())
+	fmt.Printf("Scraped: %v\n", s.CountScraped())
 }
 
 func start() {
 	c := crawler.New(flags.Url, flags.NoSubdomains)
-	defer showStats(c)
+	s := store.New()
+
+	defer showStats(s)
 
 	// Run init scrap
-	initScrap(c)
-
+	initScrap(c, s)
 	if flags.NoRecursion {
 		return
 	}
@@ -73,36 +66,34 @@ func start() {
 	pool := make([]Worker, flags.Threads)
 	for i := uint64(0); i < flags.Threads; i++ {
 		done := make(chan struct{})
-		input := make(chan string)
+		input := make(chan store.Url)
 		pool[i] = Worker{
 			input:  input,
 			done:   done,
 			isIdle: true,
 		}
 
-		go extractUrlsWorker(c, input, done)
+		go crawlerWorker(c, s, input, done)
 	}
 
 	// Scheduler
 	ticker := time.NewTicker(time.Millisecond * 50)
 	idleCounter := len(pool)
-	visits := 0
 	for {
 		for i := 0; i < len(pool); i++ {
 			if pool[i].isIdle {
-				url, isFound := c.FindInitUrl()
+				url, isFound := s.GetNextToScrap()
 
-				visits++
-				fmt.Println(i, url, visits, idleCounter)
-
-				if !isFound && idleCounter == len(pool) {
-					// There's no work to be done, exit.
-					return
-				} else {
-					c.ChangeUrlStatus(url.Url(), crawler.Processed)
-					pool[i].isIdle = false
+				if isFound {
 					idleCounter--
-					pool[i].input <- url.Url()
+					pool[i].isIdle = false
+					pool[i].input <- url
+					s.IncrementVisits()
+				} else {
+					if idleCounter == len(pool) {
+						// There's no work to be done, exit.
+						return
+					}
 				}
 			} else {
 				select {
