@@ -5,6 +5,7 @@ import (
 	"scraper/cli"
 	"scraper/crawler"
 	"scraper/store"
+	"scraper/workers"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,12 +15,6 @@ import (
 	TODO:
 		- more tags than just a[href]
 */
-
-type Worker struct {
-	input  chan<- store.Url
-	done   <-chan struct{}
-	isIdle bool
-}
 
 var flags cli.Flags
 
@@ -50,56 +45,35 @@ func showStats(s *store.ScrapStore) {
 	fmt.Printf("Scraped: %v\n", s.CountScraped())
 }
 
-func start() {
-	c := crawler.New(flags.Url, flags.NoSubdomains)
-	s := store.New()
-
-	defer showStats(s)
-
-	// Run init scrap
-	initScrap(c, s)
-	if flags.NoRecursion {
-		return
-	}
-
+func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore) {
 	// Run workers
-	pool := make([]Worker, flags.Threads)
-	for i := uint64(0); i < flags.Threads; i++ {
-		done := make(chan struct{})
-		input := make(chan store.Url)
-		pool[i] = Worker{
-			input:  input,
-			done:   done,
-			isIdle: true,
-		}
-
+	pool := workers.NewPool(flags.Threads)
+	pool.InitWorkers(func(input chan store.Url, done chan struct{}) {
 		go crawlerWorker(c, s, input, done)
-	}
+	})
 
 	// Scheduler
 	ticker := time.NewTicker(time.Millisecond * 50)
-	idleCounter := len(pool)
 	for {
-		for i := 0; i < len(pool); i++ {
-			if pool[i].isIdle {
+		for workerId := uint64(0); workerId < pool.Size; workerId++ {
+			worker := pool.GetWorkerById(workerId)
+
+			if worker.IsIdle() {
 				url, isFound := s.GetNextToScrap()
 
 				if isFound {
-					idleCounter--
-					pool[i].isIdle = false
-					pool[i].input <- url
+					worker.AssignJob(url)
 					s.IncrementVisits()
 				} else {
-					if idleCounter == len(pool) {
+					if pool.AllWorkersIdle() {
 						// There's no work to be done, exit.
 						return
 					}
 				}
 			} else {
 				select {
-				case <-pool[i].done:
-					pool[i].isIdle = true
-					idleCounter++
+				case <-worker.Done():
+					worker.SetIdle()
 					break
 				default:
 					continue
@@ -109,6 +83,21 @@ func start() {
 
 		<-ticker.C
 	}
+}
+
+func start() {
+	c := crawler.New(flags.Url, flags.NoSubdomains)
+	s := store.New()
+
+	defer showStats(s)
+
+	// First scrap to get initial input
+	initScrap(c, s)
+	if flags.NoRecursion {
+		return
+	}
+
+	runCrawlerWorkers(c, s)
 }
 
 var rootCmd = &cobra.Command{

@@ -49,7 +49,7 @@ func (s *ScrapStore) CountToScrap() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return uint64(len(s.scraped))
+	return uint64(len(s.toScrap))
 }
 
 func (s *ScrapStore) AddToScrap(url neturl.URL) {
