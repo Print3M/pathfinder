@@ -2,7 +2,7 @@
 
 # PathFinder
 
-PathFinder – the ultimate web crawler script designed for lightning-fast, concurrent, and recursive URL scraping. With its cutting-edge multithreading architecture, PathFinder ensures rapid URL extraction while guaranteeing that each page is visited only once. This powerful tool can effortlessly extract paths from various HTML tags, including `a`, `form`, `img`, `link`, and more.
+PathFinder – the ultimate web crawler script designed for lightning-fast, concurrent, and recursive URL scraping. With its cutting-edge multithreading architecture, PathFinder ensures rapid URL extraction while guaranteeing that each page is visited only once. This powerful tool can effortlessly extract paths from various HTML tags, including `a`, `form`, `iframe`, `img`, `embed`, and more.
 
 ## Usage
 

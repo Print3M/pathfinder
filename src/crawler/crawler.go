@@ -34,6 +34,7 @@ func (c *Crawler) RootUrl() *neturl.URL {
 
 func (c *Crawler) scrapRawUrls(targetUrl string) []string {
 	// TODO: Optimize, spawn colly only once + mutex
+	// TODO: Refactor .OnHTML()
 	var urls []string
 	collector := colly.NewCollector()
 
@@ -43,6 +44,14 @@ func (c *Crawler) scrapRawUrls(targetUrl string) []string {
 
 	collector.OnHTML("form[action]", func(e *colly.HTMLElement) {
 		urls = append(urls, e.Attr("action"))
+	})
+
+	collector.OnHTML("iframe[src]", func(e *colly.HTMLElement) {
+		urls = append(urls, e.Attr("src"))
+	})
+
+	collector.OnHTML("area[href]", func(e *colly.HTMLElement) {
+		urls = append(urls, e.Attr("href"))
 	})
 
 	if c.withAssets {
@@ -56,6 +65,26 @@ func (c *Crawler) scrapRawUrls(targetUrl string) []string {
 
 		collector.OnHTML("link[href]", func(e *colly.HTMLElement) {
 			urls = append(urls, e.Attr("href"))
+		})
+
+		collector.OnHTML("embed[src]", func(e *colly.HTMLElement) {
+			urls = append(urls, e.Attr("src"))
+		})
+
+		collector.OnHTML("audio[src]", func(e *colly.HTMLElement) {
+			urls = append(urls, e.Attr("src"))
+		})
+
+		collector.OnHTML("object[data]", func(e *colly.HTMLElement) {
+			urls = append(urls, e.Attr("data"))
+		})
+
+		collector.OnHTML("video[src]", func(e *colly.HTMLElement) {
+			urls = append(urls, e.Attr("src"))
+		})
+
+		collector.OnHTML("track[src]", func(e *colly.HTMLElement) {
+			urls = append(urls, e.Attr("src"))
 		})
 	}
 

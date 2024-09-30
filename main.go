@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+/*
+	- save to output file
+	- scrap external URLs but don't visit them
+	- proxy
+	- random user agent
+	- cookies
+*/
+
 func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.Url, done chan<- struct{}) {
 	// Work as long as input channel is open.
 	for url := range input {
