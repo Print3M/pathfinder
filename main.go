@@ -2,23 +2,15 @@ package main
 
 import (
 	"fmt"
-	"scraper/cli"
-	"scraper/crawler"
-	"scraper/store"
-	"scraper/workers"
+	"scraper/src/cli"
+	"scraper/src/crawler"
+	"scraper/src/store"
+	"scraper/src/workers"
 	"time"
-
-	"github.com/spf13/cobra"
 )
 
-/*
-	TODO:
-		- more tags than just a[href]
-*/
-
-var flags cli.Flags
-
 func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.Url, done chan<- struct{}) {
+	// Work as long as input channel is open.
 	for url := range input {
 		urls := c.ScrapUrlsFromUrl(url)
 
@@ -30,10 +22,11 @@ func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.U
 	}
 }
 
-func initScrap(c *crawler.Crawler, s *store.ScrapStore) {
+func runInitScrap(c *crawler.Crawler, s *store.ScrapStore) {
 	s.AddToScrap(*c.RootUrl())
 	url, _ := s.GetNextToScrap()
 	urls := c.ScrapUrlsFromUrl(url)
+	s.IncrementVisits()
 
 	for _, v := range urls {
 		s.AddToScrap(v)
@@ -45,18 +38,21 @@ func showStats(s *store.ScrapStore) {
 	fmt.Printf("Scraped: %v\n", s.CountTotalStoredUrls())
 }
 
-func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore) {
-	// Run workers
-	pool := workers.NewPool(flags.Threads)
+func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore, threads uint64) {
+	// Start workers
+	pool := workers.NewPool(threads)
 	pool.InitWorkers(func(input chan store.Url, done chan struct{}) {
 		go crawlerWorker(c, s, input, done)
 	})
 
-	// Scheduler
+	// Start scheduler
 	ticker := time.NewTicker(time.Millisecond * 50)
+
+Scheduler:
 	for {
 		for workerId := uint64(0); workerId < pool.Size; workerId++ {
 			worker := pool.GetWorkerById(workerId)
+			worker.Update()
 
 			if worker.IsIdle() {
 				url, isFound := s.GetNextToScrap()
@@ -65,18 +61,12 @@ func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore) {
 					worker.AssignJob(url)
 					s.IncrementVisits()
 				} else {
-					if pool.AllWorkersIdle() {
+					if pool.AreAllWorkersIdle() {
 						// There's no work to be done, exit.
-						return
+						pool.ShutdownAllWorkers()
+
+						break Scheduler
 					}
-				}
-			} else {
-				select {
-				case <-worker.Done():
-					worker.SetIdle()
-					break
-				default:
-					continue
 				}
 			}
 		}
@@ -85,35 +75,23 @@ func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore) {
 	}
 }
 
-func start() {
-	c := crawler.New(flags.Url, flags.NoSubdomains)
+func start(flags *cli.Flags) {
+	c := crawler.New(flags.Url, flags.NoSubdomains, flags.WithAssets)
 	s := store.New()
 
 	defer showStats(s)
 
 	// First scrap to get initial input
-	initScrap(c, s)
+	runInitScrap(c, s)
 	if flags.NoRecursion {
 		return
 	}
 
-	runCrawlerWorkers(c, s)
-}
+	runCrawlerWorkers(c, s, flags.Threads)
 
-var rootCmd = &cobra.Command{
-	Use:   "Urler",
-	Short: "This is example short",
-	Long:  "This is example long",
-	Run: func(cmd *cobra.Command, args []string) {
-		start()
-	},
+	fmt.Printf("Exit....")
 }
 
 func main() {
-	rootCmd.Flags().StringVarP(&flags.Url, "url", "u", "", "URL to scrap")
-	rootCmd.MarkFlagRequired("url")
-	rootCmd.Flags().Uint64VarP(&flags.Threads, "threads", "t", 10, "Number of concurrent threads")
-	rootCmd.Flags().BoolVar(&flags.NoRecursion, "no-recursion", false, "Disable recursive scrapping")
-	rootCmd.Flags().BoolVar(&flags.NoSubdomains, "no-subdomains", false, "Disable subdomain scrapping")
-	rootCmd.Execute()
+	cli.InitCli(start)
 }
