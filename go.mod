@@ -1,4 +1,4 @@
-module scraper
+module pathfinder
 
 go 1.23.1
 

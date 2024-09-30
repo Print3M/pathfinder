@@ -3,7 +3,7 @@ package crawler
 import (
 	"fmt"
 	neturl "net/url"
-	"scraper/src/store"
+	"pathfinder/src/store"
 	"strings"
 
 	"github.com/gocolly/colly"
@@ -33,11 +33,16 @@ func (c *Crawler) RootUrl() *neturl.URL {
 }
 
 func (c *Crawler) scrapRawUrls(targetUrl string) []string {
+	// TODO: Optimize, spawn colly only once + mutex
 	var urls []string
 	collector := colly.NewCollector()
 
 	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		urls = append(urls, e.Attr("href"))
+	})
+
+	collector.OnHTML("form[action]", func(e *colly.HTMLElement) {
+		urls = append(urls, e.Attr("action"))
 	})
 
 	if c.withAssets {

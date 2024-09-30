@@ -1,6 +1,6 @@
 package workers
 
-import "scraper/src/store"
+import "pathfinder/src/store"
 
 type Worker struct {
 	input    chan<- store.Url

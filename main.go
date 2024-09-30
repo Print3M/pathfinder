@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"scraper/src/cli"
-	"scraper/src/crawler"
-	"scraper/src/store"
-	"scraper/src/workers"
+	"pathfinder/src/cli"
+	"pathfinder/src/crawler"
+	"pathfinder/src/store"
+	"pathfinder/src/workers"
 	"time"
 )
 
@@ -33,9 +33,11 @@ func runInitScrap(c *crawler.Crawler, s *store.ScrapStore) {
 	}
 }
 
-func showStats(s *store.ScrapStore) {
-	fmt.Printf("Visited: %v\n", s.Visits())
-	fmt.Printf("Scraped: %v\n", s.CountTotalStoredUrls())
+func showStats(s *store.ScrapStore, start time.Time) {
+	fmt.Println()
+	fmt.Printf("Pages visited: %v\n", s.Visits())
+	fmt.Printf("Paths scraped: %v\n", s.CountTotalStoredUrls())
+	fmt.Printf("Elapsed time : %v\n", time.Since(start))
 }
 
 func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore, threads uint64) {
@@ -76,10 +78,11 @@ Scheduler:
 }
 
 func start(flags *cli.Flags) {
+	startTime := time.Now()
 	c := crawler.New(flags.Url, flags.NoSubdomains, flags.WithAssets)
 	s := store.New()
 
-	defer showStats(s)
+	defer showStats(s, startTime)
 
 	// First scrap to get initial input
 	runInitScrap(c, s)
@@ -89,7 +92,6 @@ func start(flags *cli.Flags) {
 
 	runCrawlerWorkers(c, s, flags.Threads)
 
-	fmt.Printf("Exit....")
 }
 
 func main() {
