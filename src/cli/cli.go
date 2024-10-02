@@ -6,9 +6,11 @@ type Flags struct {
 	Url          string
 	NoRecursion  bool
 	NoSubdomains bool
+	NoExternals  bool
 	WithAssets   bool
-	Output       string
 	Threads      uint64
+	Output       string
+	Quiet        bool
 }
 
 func InitCli(main func(flags *Flags)) {
@@ -28,13 +30,17 @@ func InitCli(main func(flags *Flags)) {
 
 	cmd.Flags().StringVarP(&flags.Output, "output", "o", "", "Output file")
 
+	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Disable printing scraped URLs on the screen")
+
 	cmd.Flags().Uint64VarP(&flags.Threads, "threads", "t", 10, "Number of concurrent threads")
 
 	cmd.Flags().BoolVar(&flags.NoRecursion, "no-recursion", false, "Disable recursive scraping")
 
-	cmd.Flags().BoolVar(&flags.NoSubdomains, "no-subdomains", false, "Disable subdomain scraping")
+	cmd.Flags().BoolVar(&flags.NoSubdomains, "no-subdomains", false, "Disable subdomains scraping")
 
-	cmd.Flags().BoolVar(&flags.WithAssets, "with-assets", false, "Enable assets scraping (images, CSS, JS etc.)")
+	cmd.Flags().BoolVar(&flags.NoExternals, "no-externals", false, "Disable external URLs scraping")
+
+	cmd.Flags().BoolVar(&flags.WithAssets, "with-assets", false, "Enable asset URLs scraping (images, CSS, JS etc.)")
 
 	cmd.Execute()
 }

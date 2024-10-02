@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"pathfinder/src/cli"
 	"pathfinder/src/crawler"
 	"pathfinder/src/store"
@@ -10,20 +11,23 @@ import (
 )
 
 /*
-	- save to output file
-	- scrap external URLs but don't visit them
+	TODO:
+	- add images
 	- proxy
-	- random user agent
 	- cookies
+	- interrupt ctrl+c
+	- rate limiting
 */
 
 func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.Url, done chan<- struct{}) {
+	collector := crawler.NewCollector()
+
 	// Work as long as input channel is open.
 	for url := range input {
-		urls := c.ScrapUrlsFromUrl(url)
+		urls := c.ScrapUrlsFromUrl(collector, url)
 
 		for _, url := range urls {
-			s.AddToScrap(url)
+			s.AddUrl(url)
 		}
 
 		done <- struct{}{}
@@ -31,20 +35,21 @@ func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.U
 }
 
 func runInitScrap(c *crawler.Crawler, s *store.ScrapStore) {
-	s.AddToScrap(*c.RootUrl())
-	url, _ := s.GetNextToScrap()
-	urls := c.ScrapUrlsFromUrl(url)
+	s.AddUrl(*c.RootUrl())
+	url, _ := s.GetNextUrlToVisit()
+	collector := crawler.NewCollector()
+	urls := c.ScrapUrlsFromUrl(collector, url)
 	s.IncrementVisits()
 
 	for _, v := range urls {
-		s.AddToScrap(v)
+		s.AddUrl(v)
 	}
 }
 
 func showStats(s *store.ScrapStore, start time.Time) {
 	fmt.Println()
 	fmt.Printf("Pages visited: %v\n", s.Visits())
-	fmt.Printf("Paths scraped: %v\n", s.CountTotalStoredUrls())
+	fmt.Printf("URLs  scraped: %v\n", s.CountScrapedUrls())
 	fmt.Printf("Elapsed time : %v\n", time.Since(start))
 }
 
@@ -65,7 +70,7 @@ Scheduler:
 			worker.Update()
 
 			if worker.IsIdle() {
-				url, isFound := s.GetNextToScrap()
+				url, isFound := s.GetNextUrlToVisit()
 
 				if isFound {
 					worker.AssignJob(url)
@@ -85,10 +90,27 @@ Scheduler:
 	}
 }
 
+func prepareOutputFile(name string) *os.File {
+	file, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Printf("Open file error: %v\n", err)
+		os.Exit(1)
+	}
+
+	return file
+}
+
 func start(flags *cli.Flags) {
 	startTime := time.Now()
-	c := crawler.New(flags.Url, flags.NoSubdomains, flags.WithAssets)
-	s := store.New()
+	c := crawler.NewCrawler(flags.Url, flags.NoSubdomains, flags.NoExternals, flags.WithAssets)
+
+	// Prepare output file
+	var file *os.File
+	if len(flags.Output) > 0 {
+		file = prepareOutputFile(flags.Output)
+		defer file.Close()
+	}
+	s := store.NewStore(file, flags.Quiet)
 
 	defer showStats(s, startTime)
 

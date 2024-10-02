@@ -2,112 +2,50 @@ package crawler
 
 import (
 	"fmt"
-	neturl "net/url"
 	"pathfinder/src/store"
 	"strings"
-
-	"github.com/gocolly/colly"
 )
 
 type Crawler struct {
-	rootUrl      neturl.URL
+	rootUrl      *store.Url
 	noSubdomains bool
+	noExternals  bool
 	withAssets   bool
 }
 
-func New(rootUrl string, noSubdomains bool, withAssets bool) *Crawler {
-	url, err := neturl.Parse(rootUrl)
+func NewCrawler(rootUrl string, noSubdomains bool, noExternals bool, withAssets bool) *Crawler {
+	url, err := store.NewUrl(rootUrl)
 	if err != nil {
 		panic("Parse error")
 	}
 
 	return &Crawler{
-		rootUrl:      *url,
+		rootUrl:      url,
 		noSubdomains: noSubdomains,
+		noExternals:  noExternals,
 		withAssets:   withAssets,
 	}
 }
 
-func (c *Crawler) RootUrl() *neturl.URL {
-	return &c.rootUrl
+func (c *Crawler) RootUrl() *store.Url {
+	return c.rootUrl
 }
 
-func (c *Crawler) scrapRawUrls(targetUrl string) []string {
-	// TODO: Optimize, spawn colly only once + mutex
-	// TODO: Refactor .OnHTML()
-	var urls []string
-	collector := colly.NewCollector()
-
-	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		urls = append(urls, e.Attr("href"))
-	})
-
-	collector.OnHTML("form[action]", func(e *colly.HTMLElement) {
-		urls = append(urls, e.Attr("action"))
-	})
-
-	collector.OnHTML("iframe[src]", func(e *colly.HTMLElement) {
-		urls = append(urls, e.Attr("src"))
-	})
-
-	collector.OnHTML("area[href]", func(e *colly.HTMLElement) {
-		urls = append(urls, e.Attr("href"))
-	})
-
-	if c.withAssets {
-		collector.OnHTML("img[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-
-		collector.OnHTML("script[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-
-		collector.OnHTML("link[href]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("href"))
-		})
-
-		collector.OnHTML("embed[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-
-		collector.OnHTML("audio[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-
-		collector.OnHTML("object[data]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("data"))
-		})
-
-		collector.OnHTML("video[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-
-		collector.OnHTML("track[src]", func(e *colly.HTMLElement) {
-			urls = append(urls, e.Attr("src"))
-		})
-	}
-
-	_ = collector.Visit(targetUrl)
-
-	return urls
-}
-
-func (c *Crawler) ScrapUrlsFromUrl(targetUrl store.Url) []neturl.URL {
-	rawUrls := c.scrapRawUrls(targetUrl.String())
+func (c *Crawler) ScrapUrlsFromUrl(collector *Collector, targetUrl store.Url) []store.Url {
+	rawPaths := collector.CollectRawPaths(targetUrl.String(), c.withAssets)
 
 	// Final filtering and processing
-	var results []neturl.URL
-	for _, rawUrl := range rawUrls {
-		rawUrl = strings.TrimSpace(rawUrl)
+	var results []store.Url
+	for _, rawPath := range rawPaths {
+		rawPath = strings.TrimSpace(rawPath)
 
-		if strings.HasPrefix(rawUrl, "data:") {
+		if strings.HasPrefix(rawPath, "data:") {
 			continue
 		}
 
-		url, err := c.rootUrl.Parse(rawUrl)
+		url, err := c.rootUrl.Parse(rawPath)
 		if err != nil {
-			fmt.Printf("[-] Parse Error: %v\n", rawUrl)
+			fmt.Printf("[-] Parse Error: %v\n", rawPath)
 			continue
 		}
 
@@ -116,6 +54,14 @@ func (c *Crawler) ScrapUrlsFromUrl(targetUrl store.Url) []neturl.URL {
 		}
 
 		if !strings.HasSuffix(url.Host, c.rootUrl.Host) {
+			if c.noExternals {
+				continue
+			}
+
+			url.IsExternal = true
+		}
+
+		if c.noExternals && !strings.HasSuffix(url.Host, c.rootUrl.Host) {
 			continue
 		}
 

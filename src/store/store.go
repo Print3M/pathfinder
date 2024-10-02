@@ -2,32 +2,36 @@ package store
 
 import (
 	"fmt"
-	neturl "net/url"
+	"os"
 	"sync"
 )
 
-type Url neturl.URL
-
-func (u *Url) IsEqual(url neturl.URL) bool {
-	return u.Scheme == url.Scheme && u.Host == url.Host && u.Path == url.Path
-}
-
-func (u *Url) String() string {
-	return u.Scheme + "://" + u.Host + u.Path
-}
-
 type ScrapStore struct {
-	toScrap []Url
+	toVisit []Url
 	scraped []Url
 	visits  uint64
+	file    *os.File
+
+	quiet bool
 
 	mu sync.RWMutex
 }
 
-func New() *ScrapStore {
+func NewStore(file *os.File, quiet bool) *ScrapStore {
 	return &ScrapStore{
-		toScrap: make([]Url, 0),
+		toVisit: make([]Url, 0),
 		scraped: make([]Url, 0),
+		file:    file,
+		quiet:   quiet,
+	}
+}
+
+func (s *ScrapStore) appendToFile(v string) {
+	if s.file != nil {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		s.file.Write([]byte(v + "\n"))
 	}
 }
 
@@ -38,24 +42,18 @@ func (s *ScrapStore) Visits() uint64 {
 	return s.visits
 }
 
-func (s *ScrapStore) CountTotalStoredUrls() uint64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return uint64(len(s.scraped) + len(s.toScrap))
+func (c *ScrapStore) AddUrl(url Url) {
+	if url.IsExternal {
+		c.addExternalUrl(url)
+	} else {
+		c.addUrlToVisit(url)
+	}
 }
 
-func (s *ScrapStore) CountToScrapUrls() uint64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return uint64(len(s.toScrap))
-}
-
-func (s *ScrapStore) AddToScrap(url neturl.URL) {
+func (s *ScrapStore) addUrlToVisit(url Url) {
 	s.mu.RLock()
 
-	for _, item := range s.toScrap {
+	for _, item := range s.toVisit {
 		if item.IsEqual(url) {
 			s.mu.RUnlock()
 			return
@@ -71,22 +69,62 @@ func (s *ScrapStore) AddToScrap(url neturl.URL) {
 
 	s.mu.RUnlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
-	fmt.Println(url.String())
-	s.toScrap = append(s.toScrap, Url(url))
+	if !s.quiet {
+		fmt.Println(url.String())
+	}
+
+	parsed := Url(url)
+	s.toVisit = append(s.toVisit, parsed)
+
+	s.mu.Unlock()
+
+	s.appendToFile(parsed.String())
 }
 
-func (s *ScrapStore) GetNextToScrap() (Url, bool) {
+func (s *ScrapStore) addExternalUrl(url Url) {
+	s.mu.RLock()
+
+	for _, item := range s.scraped {
+		if item.IsEqual(url) {
+			s.mu.RUnlock()
+			return
+		}
+	}
+
+	s.mu.RUnlock()
+	s.mu.Lock()
+
+	if !s.quiet {
+		fmt.Println(url.String())
+	}
+
+	// We don't visit external URL so add them directly to scraped URLs
+	parsed := Url(url)
+	s.scraped = append(s.scraped, parsed)
+
+	s.mu.Unlock()
+
+	s.appendToFile(parsed.String())
+}
+
+func (s *ScrapStore) CountScrapedUrls() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return uint64(len(s.scraped))
+}
+
+func (s *ScrapStore) GetNextUrlToVisit() (Url, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.toScrap) == 0 {
+	if len(s.toVisit) == 0 {
 		return Url{}, false
 	}
 
-	toScrap := s.toScrap[0]
-	s.toScrap = s.toScrap[1:]
+	toScrap := s.toVisit[0]
+	s.toVisit = s.toVisit[1:]
 	s.scraped = append(s.scraped, toScrap)
 
 	return toScrap, true
