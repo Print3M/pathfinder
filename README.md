@@ -6,6 +6,23 @@ PathFinder – the ultimate web crawler script designed for lightning-fast, conc
 
 **Usage**: It is a great tool for discovering new web paths, creating a site map, gathering OSINT information. It might be very useful for bug hunters and pentesters.
 
+## Installation
+
+There are 2 options:
+
+1. Download latest binary from [GitHub releases](https://github.com/fastapi/fastapi/releases).
+2. Build manually:
+
+```bash
+# Download and build the source code
+git clone https://github.com/Print3M/pathfinder
+cd pathfinder/
+go build
+
+# Run
+./pathfinder --help
+```
+
 ## How to use it?
 
 TL;DR;
