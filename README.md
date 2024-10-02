@@ -1,10 +1,8 @@
-> **THIS REPO IS UNDER HEAVY DEVELOPMENT...**
-
-# PathFinder
+# PathFinder 🕵🏻‍♂️🔎🌐
 
 PathFinder – the ultimate web crawler script designed for lightning-fast, concurrent, and recursive URL scraping. Cutting-edge multithreading architecture ensures rapid URL extraction while guaranteeing that each page is visited only once. This tool extracts URLs from various HTML tags, including `a`, `form`, `iframe`, `img`, `embed`, and more. External URLs, relative paths and subdomains are supported as well.
 
-**Usage**: It is a great tool for discovering new web paths, creating a site map, gathering OSINT information. It might be very useful for bug hunters and pentesters.
+**Usage**: It is a great tool for discovering new web paths and subdomains, creating a site map, gathering OSINT information. It might be very useful for bug hunters and pentesters. 🔥👾🔥
 
 ## Installation
 
@@ -71,19 +69,19 @@ Use this parameter to disable recursive scraping. No other page will be visited 
 
 `--no-subdomains` [default: false]
 
-Use this parameter to disable scraping of subdomains to the URL provided using `-u <url>` parameter.
+Use this parameter to disable scraping of subdomains of the URL provided using `-u <url>` parameter.
 
-Example (`pathfinder -u http://test.example.com`):
+Example (`-u http://test.example.com`):
 
-- `http://test.example.com/index.php` - is scraped.
-- `http://api.test.example.com/index.php` - is scraped.
-- `http://example.com/index.php` - is not scraped.
+- `http://test.example.com/index.php` - ✅ scraped
+- `http://api.test.example.com/index.php` - ✅ scraped
+- `http://example.com/index.php` - ❌ not scraped.
 
-Example (`pathfinder -u http://test.example.com --no-subdomains`):
+Example (`-u http://test.example.com --no-subdomains`):
 
-- `http://test.example.com/index.php` - is scraped.
-- `http://api.test.example.com/index.php` - is not scraped.
-- `http://example.com/index.php` - is not scraped.
+- `http://test.example.com/index.php` - ✅ scraped.
+- `http://api.test.example.com/index.php` - ❌ not scraped.
+- `http://example.com/index.php` - ❌ not scraped.
 
 ### Disable externals scraping
 
