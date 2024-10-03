@@ -1,6 +1,8 @@
-# PathFinder 🕵🏻‍♂️🔎🌐
+# PathFinder 🕵🏻‍♂️🌐
 
 PathFinder – the ultimate web crawler script designed for lightning-fast, concurrent, and recursive URL scraping. Cutting-edge multithreading architecture ensures rapid URL extraction while guaranteeing that each page is visited only once. This tool extracts URLs from various HTML tags, including `a`, `form`, `iframe`, `img`, `embed`, and more. External URLs, relative paths and subdomains are supported as well.
+
+![Example PathFinder usage](_img/img-01.jpg)
 
 **Usage**: It is a great tool for discovering new web paths and subdomains, creating a site map, gathering OSINT information. It might be very useful for bug hunters and pentesters. 🔥👾🔥
 
