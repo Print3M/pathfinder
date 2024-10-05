@@ -7,8 +7,8 @@ import (
 )
 
 type ScrapStore struct {
-	toVisit []Url
-	scraped []Url
+	toVisit map[string]Url
+	scraped map[string]Url
 	visits  uint
 	file    *os.File
 
@@ -19,8 +19,8 @@ type ScrapStore struct {
 
 func NewStore(file *os.File, quiet bool) *ScrapStore {
 	return &ScrapStore{
-		toVisit: make([]Url, 0, 4096),
-		scraped: make([]Url, 0, 4096),
+		toVisit: make(map[string]Url),
+		scraped: make(map[string]Url),
 		file:    file,
 		quiet:   quiet,
 	}
@@ -51,59 +51,47 @@ func (c *ScrapStore) AddUrl(url Url) {
 }
 
 func (s *ScrapStore) addUrlToVisit(url Url) {
-	s.mu.RLock()
-
-	for _, item := range s.toVisit {
-		if item.IsEqual(url) {
-			s.mu.RUnlock()
-			return
-		}
-	}
-
-	for _, item := range s.scraped {
-		if item.IsEqual(url) {
-			s.mu.RUnlock()
-			return
-		}
-	}
-
-	s.mu.RUnlock()
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := url.String()
+
+	if _, ok := s.toVisit[key]; ok {
+		return
+	}
+
+	if _, ok := s.scraped[key]; ok {
+		return
+	}
 
 	if !s.quiet {
-		fmt.Println(url.String())
+		fmt.Println(key)
 	}
 
-	s.toVisit = append(s.toVisit, url)
+	s.toVisit[key] = url
 
-	s.mu.Unlock()
-
-	s.appendToFile(url.String())
+	s.appendToFile(key)
 }
 
 func (s *ScrapStore) addExternalUrl(url Url) {
-	s.mu.RLock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for _, item := range s.scraped {
-		if item.IsEqual(url) {
-			s.mu.RUnlock()
-			return
-		}
+	key := url.String()
+
+	// TODO: Is checking required?
+	if _, ok := s.scraped[key]; ok {
+		return
 	}
 
-	s.mu.RUnlock()
-	s.mu.Lock()
-
 	if !s.quiet {
-		fmt.Println(url.String())
+		fmt.Println(key)
 	}
 
 	// We don't visit external URL so add them directly to scraped URLs
-	s.scraped = append(s.scraped, url)
+	s.scraped[key] = url
 
-	s.mu.Unlock()
-
-	s.appendToFile(url.String())
+	s.appendToFile(key)
 }
 
 func (s *ScrapStore) CountScrapedUrls() uint {
@@ -121,11 +109,18 @@ func (s *ScrapStore) GetNextUrlToVisit() (Url, bool) {
 		return Url{}, false
 	}
 
-	toScrap := s.toVisit[0]
-	s.toVisit = s.toVisit[1:]
-	s.scraped = append(s.scraped, toScrap)
+	var key string
+	var val Url
+	for k, v := range s.toVisit {
+		key = k
+		val = v
+		break
+	}
 
-	return toScrap, true
+	s.scraped[key] = val
+	delete(s.toVisit, key)
+
+	return val, true
 }
 
 func (s *ScrapStore) IncrementVisits() {
