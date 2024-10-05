@@ -11,13 +11,10 @@ type Url struct {
 
 func NewUrl(url string) (*Url, error) {
 	parsed, err := neturl.Parse(url)
-	if err != nil {
-		return nil, err
-	}
 
 	return &Url{
 		URL: parsed,
-	}, nil
+	}, err
 }
 
 func (u *Url) Parse(url string) (*Url, error) {

@@ -11,9 +11,10 @@ type Crawler struct {
 	noSubdomains bool
 	noExternals  bool
 	withAssets   bool
+	headers      []string
 }
 
-func NewCrawler(rootUrl string, noSubdomains bool, noExternals bool, withAssets bool) *Crawler {
+func NewCrawler(rootUrl string, noSubdomains bool, noExternals bool, withAssets bool, headers []string) *Crawler {
 	url, err := store.NewUrl(rootUrl)
 	if err != nil {
 		panic("Parse error")
@@ -24,6 +25,7 @@ func NewCrawler(rootUrl string, noSubdomains bool, noExternals bool, withAssets 
 		noSubdomains: noSubdomains,
 		noExternals:  noExternals,
 		withAssets:   withAssets,
+		headers:      headers,
 	}
 }
 
@@ -31,8 +33,8 @@ func (c *Crawler) RootUrl() *store.Url {
 	return c.rootUrl
 }
 
-func (c *Crawler) ScrapUrlsFromUrl(collector *Collector, targetUrl store.Url) []store.Url {
-	rawPaths := collector.CollectRawPaths(targetUrl.String(), c.withAssets)
+func (c *Crawler) ScrapUrlsFromUrl(collector *collector, targetUrl store.Url) []store.Url {
+	rawPaths := collector.collectRawPaths(targetUrl.String())
 
 	// Final filtering and processing
 	var results []store.Url
@@ -69,4 +71,10 @@ func (c *Crawler) ScrapUrlsFromUrl(collector *Collector, targetUrl store.Url) []
 	}
 
 	return results
+}
+
+func (c *Crawler) NewCollector() *collector {
+	collector := newCollector(c.withAssets, c.headers)
+
+	return collector
 }

@@ -47,6 +47,12 @@ Use this parameter to set the start page for the script. By default, the script 
 
 Use this parameter to set the number of threads that will extract data concurrently.
 
+## Rate limiting
+
+`-r <reqs_per_sec>`, `--rate <reqs_per_sec>` [default: none]
+
+Use this parameter to specify max number of requests per second. It's a total number of requests per second - number of threads doesn't matter. By default, requests are sent as fast as possible! 🚄💨
+
 ### Output file
 
 `-o <file>`, `--output <file>` [default: none]
@@ -54,6 +60,16 @@ Use this parameter to set the number of threads that will extract data concurren
 Use this parameter to specify output file where URLs will be saved. However, they will be still printed out on the screen if you do not use quiet mode (`-q` or `--quite`).
 
 Output is saved to a file on the fly, so even if you stop executing the script the downloaded URLs will be saved.  
+
+### Add HTTP header
+
+`-H <header>`, `--header <header>` [default: none]
+
+Use this parameter to specify custom HTTP headers. They are used with every scraping request. One `-H` parameter must contain only one HTTP header but you can use it multiple times. Headers
+
+Example:
+
+`./pathfinder ... -H "Authorization: test" -H "Cookies: cookie1=choco; cookie2=yummy"`
 
 ### Quiet mode
 

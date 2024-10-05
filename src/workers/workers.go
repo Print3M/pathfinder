@@ -52,11 +52,11 @@ func (w *Worker) Shutdown() {
 
 type Pool struct {
 	workers     []Worker
-	Size        uint64
-	idleCounter uint64
+	Size        uint
+	idleCounter uint
 }
 
-func NewPool(size uint64) Pool {
+func NewPool(size uint) Pool {
 	return Pool{
 		workers:     make([]Worker, size),
 		Size:        size,
@@ -65,7 +65,7 @@ func NewPool(size uint64) Pool {
 }
 
 func (p *Pool) InitWorkers(job func(chan store.Url, chan struct{})) {
-	for i := uint64(0); i < p.Size; i++ {
+	for i := uint(0); i < p.Size; i++ {
 		worker, input, done := NewWorker()
 		p.workers[i] = *worker
 
@@ -73,7 +73,7 @@ func (p *Pool) InitWorkers(job func(chan store.Url, chan struct{})) {
 	}
 }
 
-func (p *Pool) GetWorkerById(workerId uint64) *Worker {
+func (p *Pool) GetWorkerById(workerId uint) *Worker {
 	return &p.workers[workerId]
 }
 

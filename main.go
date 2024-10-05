@@ -12,32 +12,15 @@ import (
 
 /*
 	TODO:
-	- add images
 	- proxy
-	- cookies
 	- interrupt ctrl+c
-	- rate limiting
+	- change slice to map
 */
-
-func crawlerWorker(c *crawler.Crawler, s *store.ScrapStore, input <-chan store.Url, done chan<- struct{}) {
-	collector := crawler.NewCollector()
-
-	// Work as long as input channel is open.
-	for url := range input {
-		urls := c.ScrapUrlsFromUrl(collector, url)
-
-		for _, url := range urls {
-			s.AddUrl(url)
-		}
-
-		done <- struct{}{}
-	}
-}
 
 func runInitScrap(c *crawler.Crawler, s *store.ScrapStore) {
 	s.AddUrl(*c.RootUrl())
 	url, _ := s.GetNextUrlToVisit()
-	collector := crawler.NewCollector()
+	collector := c.NewCollector()
 	urls := c.ScrapUrlsFromUrl(collector, url)
 	s.IncrementVisits()
 
@@ -53,61 +36,14 @@ func showStats(s *store.ScrapStore, start time.Time) {
 	fmt.Printf("Elapsed time : %v\n", time.Since(start))
 }
 
-func runCrawlerWorkers(c *crawler.Crawler, s *store.ScrapStore, threads uint64) {
-	// Start workers
-	pool := workers.NewPool(threads)
-	pool.InitWorkers(func(input chan store.Url, done chan struct{}) {
-		go crawlerWorker(c, s, input, done)
-	})
-
-	// Start scheduler
-	ticker := time.NewTicker(time.Millisecond * 50)
-
-Scheduler:
-	for {
-		for workerId := uint64(0); workerId < pool.Size; workerId++ {
-			worker := pool.GetWorkerById(workerId)
-			worker.Update()
-
-			if worker.IsIdle() {
-				url, isFound := s.GetNextUrlToVisit()
-
-				if isFound {
-					worker.AssignJob(url)
-					s.IncrementVisits()
-				} else {
-					if pool.AreAllWorkersIdle() {
-						// There's no work to be done, exit.
-						pool.ShutdownAllWorkers()
-
-						break Scheduler
-					}
-				}
-			}
-		}
-
-		<-ticker.C
-	}
-}
-
-func prepareOutputFile(name string) *os.File {
-	file, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Printf("Open file error: %v\n", err)
-		os.Exit(1)
-	}
-
-	return file
-}
-
 func start(flags *cli.Flags) {
 	startTime := time.Now()
-	c := crawler.NewCrawler(flags.Url, flags.NoSubdomains, flags.NoExternals, flags.WithAssets)
+	c := crawler.NewCrawler(flags.Url, flags.NoSubdomains, flags.NoExternals, flags.WithAssets, flags.Headers)
 
 	// Prepare output file
 	var file *os.File
 	if len(flags.Output) > 0 {
-		file = prepareOutputFile(flags.Output)
+		file = cli.PrepareOutputFile(flags.Output)
 		defer file.Close()
 	}
 	s := store.NewStore(file, flags.Quiet)
@@ -120,8 +56,7 @@ func start(flags *cli.Flags) {
 		return
 	}
 
-	runCrawlerWorkers(c, s, flags.Threads)
-
+	workers.RunCrawlerWorkers(c, s, flags.Threads, flags.Rate)
 }
 
 func main() {

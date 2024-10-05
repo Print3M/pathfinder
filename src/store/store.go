@@ -9,7 +9,7 @@ import (
 type ScrapStore struct {
 	toVisit []Url
 	scraped []Url
-	visits  uint64
+	visits  uint
 	file    *os.File
 
 	quiet bool
@@ -19,8 +19,8 @@ type ScrapStore struct {
 
 func NewStore(file *os.File, quiet bool) *ScrapStore {
 	return &ScrapStore{
-		toVisit: make([]Url, 0),
-		scraped: make([]Url, 0),
+		toVisit: make([]Url, 0, 4096),
+		scraped: make([]Url, 0, 4096),
 		file:    file,
 		quiet:   quiet,
 	}
@@ -35,7 +35,7 @@ func (s *ScrapStore) appendToFile(v string) {
 	}
 }
 
-func (s *ScrapStore) Visits() uint64 {
+func (s *ScrapStore) Visits() uint {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -74,12 +74,11 @@ func (s *ScrapStore) addUrlToVisit(url Url) {
 		fmt.Println(url.String())
 	}
 
-	parsed := Url(url)
-	s.toVisit = append(s.toVisit, parsed)
+	s.toVisit = append(s.toVisit, url)
 
 	s.mu.Unlock()
 
-	s.appendToFile(parsed.String())
+	s.appendToFile(url.String())
 }
 
 func (s *ScrapStore) addExternalUrl(url Url) {
@@ -100,19 +99,18 @@ func (s *ScrapStore) addExternalUrl(url Url) {
 	}
 
 	// We don't visit external URL so add them directly to scraped URLs
-	parsed := Url(url)
-	s.scraped = append(s.scraped, parsed)
+	s.scraped = append(s.scraped, url)
 
 	s.mu.Unlock()
 
-	s.appendToFile(parsed.String())
+	s.appendToFile(url.String())
 }
 
-func (s *ScrapStore) CountScrapedUrls() uint64 {
+func (s *ScrapStore) CountScrapedUrls() uint {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return uint64(len(s.scraped))
+	return uint(len(s.scraped))
 }
 
 func (s *ScrapStore) GetNextUrlToVisit() (Url, bool) {

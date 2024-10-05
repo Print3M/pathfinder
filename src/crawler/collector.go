@@ -2,40 +2,64 @@ package crawler
 
 import (
 	"math/rand/v2"
+	"strings"
 
 	"github.com/gocolly/colly"
 )
 
-type Collector struct {
-	engine *colly.Collector
+type collector struct {
+	engine     *colly.Collector
+	headers    []string
+	withAssets bool
 }
 
-func NewCollector() *Collector {
+func newCollector(withAssets bool, headers []string) *collector {
 	engine := colly.NewCollector()
 
-	return &Collector{
-		engine: engine,
+	c := collector{
+		engine:     engine,
+		withAssets: withAssets,
+		headers:    headers,
 	}
+
+	// Prepare extra HTTP headers
+	if len(headers) > 0 {
+		c.engine.OnRequest(func(r *colly.Request) {
+			for _, header := range headers {
+				parts := strings.Split(header, ":")
+
+				if len(parts) < 2 {
+					continue
+				}
+
+				value := strings.Join(parts[1:], ":")
+				r.Headers.Set(parts[0], value)
+			}
+		})
+	}
+
+	return &c
 }
 
-func (c *Collector) addOnHtml(paths *[]string, querySelector string, attrName string) {
+func (c *collector) addOnHtml(paths *[]string, querySelector string, attrName string) {
 	c.engine.OnHTML(querySelector, func(e *colly.HTMLElement) {
 		*paths = append(*paths, e.Attr(attrName))
 	})
 }
 
-func (c *Collector) getRandomUserAgent() string {
+func (c *collector) getRandomUserAgent() string {
 	return userAgents[rand.IntN(len(userAgents))]
 }
 
-func (c *Collector) CollectRawPaths(targetUrl string, withAssets bool) []string {
+func (c *collector) collectRawPaths(targetUrl string) []string {
 	var paths []string
 	c.addOnHtml(&paths, "a[href]", "href")
 	c.addOnHtml(&paths, "form[action]", "action")
 	c.addOnHtml(&paths, "iframe[src]", "src")
 	c.addOnHtml(&paths, "area[href]", "href")
+	c.addOnHtml(&paths, "base[href]", "href")
 
-	if withAssets {
+	if c.withAssets {
 		c.addOnHtml(&paths, "area[href]", "href")
 		c.addOnHtml(&paths, "img[src]", "src")
 		c.addOnHtml(&paths, "script[src]", "src")
@@ -45,6 +69,7 @@ func (c *Collector) CollectRawPaths(targetUrl string, withAssets bool) []string 
 		c.addOnHtml(&paths, "object[data]", "data")
 		c.addOnHtml(&paths, "video[src]", "src")
 		c.addOnHtml(&paths, "track[src]", "src")
+		c.addOnHtml(&paths, "source[src]", "src")
 	}
 
 	c.engine.UserAgent = c.getRandomUserAgent()
@@ -54,7 +79,7 @@ func (c *Collector) CollectRawPaths(targetUrl string, withAssets bool) []string 
 	return paths
 }
 
-var userAgents = []string{
+var userAgents = [...]string{
 	"Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko",
 	"Mozilla/5.0 (Windows NT 6.1; rv:40.0) Gecko/20100101 Firefox/40.0",
 	"Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.89 Safari/537.36",
