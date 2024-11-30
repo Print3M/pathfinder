@@ -13,6 +13,13 @@ There are 2 options:
 1. Download latest binary from [GitHub releases](https://github.com/Print3M/pathfinder/releases).
 2. Build manually:
 
+#### Easy install
+```bash
+go install -v github.com/Print3M/pathfinder@latest
+```
+
+OR
+
 ```bash
 # Download and build the source code
 git clone https://github.com/Print3M/pathfinder
@@ -21,6 +28,27 @@ go build
 
 # Run
 ./pathfinder --help
+```
+
+## Flags
+```bash
+PathFinder is a crawler script for concurrent and recursive scraping of URLs from any website.
+
+Usage:
+  PathFinder [flags]
+
+Flags:
+  -H, --headers stringArray   Add HTTP header (one -H must contain only one header)
+  -h, --help                  help for PathFinder
+      --no-externals          Disable external URLs scraping
+      --no-recursion          Disable recursive scraping
+      --no-subdomains         Disable subdomains scraping
+  -o, --output string         Output file
+  -q, --quiet                 Disable printing scraped URLs on the screen
+  -r, --rate uint             Number of requests per second
+  -t, --threads uint          Number of concurrent threads (default 10)
+  -u, --url string            URL to start
+      --with-assets           Enable asset URLs scraping (images, CSS, JS etc.)
 ```
 
 ## How to use it?
